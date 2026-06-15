@@ -19,7 +19,7 @@ A version of the internet famous "Horse Race Tests" game now for your pipboy. St
 
 - Press the left knob to begin the race.
 - Press the left knob again to start another!
-- Press and of the bottom three buttons to exit the game, or power button to reset the device.
+- Press any of the bottom three buttons to exit the game, or power button to reset the device.
 
 ### License(s)
 
