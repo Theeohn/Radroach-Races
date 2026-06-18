@@ -24,7 +24,7 @@
   // trackWalls will be a flattened Int16Array instead of an array of objects
   let trackWalls = new Int16Array(0); 
   
-  let goalPos = { x: 0, y: 0, w: 13, h: 13 };
+  let goalPos = { x: 0, y: 0, w: 11, h: 11 };
   let startX = 0;
   let startYBase = 0;
   let radroaches = [];
@@ -45,7 +45,7 @@
   };
 
   const MAP_BLUEPRINTS = [
-    {
+    { // Map 1
       goal: { x: 375, y: 200 },
       start: { x: 30, y: 55 },
       walls: [
@@ -55,7 +55,7 @@
         { x1: 200, y1: 155, x2: 200, y2: 285 }
       ]
     },
-    {
+    { // Map 2
       goal: { x: 40, y: 65 },
       start: { x: 30, y: 120 },
       walls: [
@@ -64,7 +64,7 @@
         { x1: 185, y1: 200, x2: 310, y2: 200 }
       ]
     },
-    {
+    { // Map 3
       goal: { x: 340, y: 50 },
       start: { x: 30, y: 185 },
       walls: [
@@ -73,7 +73,7 @@
         { x1: 210, y1: 220, x2: 465, y2: 220 }
       ]
     },
-    {
+    { // Map 4
       goal: { x: 415, y: 205 },
       start: { x: 30, y: 110 },
       walls: [
@@ -83,14 +83,29 @@
         { x1: 385, y1: 105, x2: 385, y2: 245 }
       ]
     },
-    {
-      goal: { x: 42, y: 272 },
-      start: { x: 30, y: 55 },
+    { // Map 5
+      goal: { x: 75, y: 250 },
+      start: { x: 63, y: 27 },
       walls: [
-        { x1: 18,  y1: 165, x2: 355, y2: 165 },
-        { x1: 90,  y1: 240, x2: 465, y2: 240 }
+        { x1: 18,  y1: 128, x2: 323, y2: 128 },
+        { x1: 323, y1: 128, x2: 323, y2: 70  },
+        { x1: 100, y1: 180, x2: 465, y2: 180 },
+        { x1: 319, y1: 180, x2: 319, y2: 264 },
+        { x1: 18,  y1: 229, x2: 180, y2: 229 }
       ]
-    }
+    },
+    { // Map 6
+      goal: { x: 135, y: 31 },
+      start: { x: 30, y: 197 },
+      walls: [
+        { x1: 18,  y1: 180, x2: 320, y2: 180 },
+        { x1: 320, y1: 180, x2: 320, y2: 80  },
+        { x1: 120, y1: 80,  x2: 320, y2: 80  },
+        { x1: 120, y1: 18,  x2: 120, y2: 80  },
+        { x1: 380, y1: 100, x2: 465, y2: 100 },
+        { x1: 380, y1: 100, x2: 380, y2: 298 }
+      ]
+    }, 
   ];
 
   // ─── Title Screen ─────────────────────────────────────────────────────────
@@ -152,7 +167,8 @@
     gameState = 'COUNTDOWN';
     countdownValue = 5;
 
-    currentMapId = Math.randInt(5);
+    // Dynamically uses MAP_BLUEPRINTS.length so you can add more maps easily!
+    currentMapId = Math.randInt(MAP_BLUEPRINTS.length);
     const bp = MAP_BLUEPRINTS[currentMapId];
     const bpWalls = bp.walls;
     
