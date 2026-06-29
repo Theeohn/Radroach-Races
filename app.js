@@ -14,7 +14,7 @@
   let countdownTimer = null;
 
   // Set to 0 for random map, or 1–10 to force a specific map for testing.
-  const TEST_MAP = 10;
+  const TEST_MAP = 0;
 
   // Game States
   let gameState = 'TITLE_SCREEN';
