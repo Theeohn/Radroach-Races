@@ -13,30 +13,26 @@
   let mainLoopInterval = null;
   let countdownTimer = null;
 
+  // Set to 0 for random map, or 1–10 to force a specific map for testing.
+  const TEST_MAP = 10;
+
   // Game States
   let gameState = 'TITLE_SCREEN';
   let winnerId = -1;
   let countdownValue = 5;
-  let currentMapId = 0;
+  let currentMapId = 2;
 
   let trackWalls = new Int16Array(0);
 
-  let goalPos = { x: 0, y: 0, w: 18, h: 18, hitW: 17, hitH: 17 };
+  let goalPos = { x: 0, y: 0, w: 18, h: 18, hitW: 16, hitH: 16 };
   let startX = 0;
   let startYBase = 0;
   let radroaches = [];
 
   let trackDirty = 1;
+  let lastFlapTime = 0;
 
-  const SHAPE_NAMES = { 1: 'SQUARE', 2: 'TRIANGLE', 3: 'DIAMOND', 4: 'PENTAGON', 5: 'HEXAGON' };
-
-  const SHAPES = {
-    square:   { half: 8.6,   hitR: 11.0 },
-    triangle: { half: 11.15, hitR: 11.4 },
-    diamond:  { half: 9.86,  hitR: 11.4 },
-    pentagon: { half: 9.78,  hitR: 11.4 },
-    hexagon:  { half: 9.11,  hitR: 11.4 }
-  };
+  const ROACH_LETTERS = { 1: 'R', 2: 'O', 3: 'A', 4: 'C', 5: 'H' };
 
   // ─── Map Data ─────────────────────────────────────────────────────────────
   //
@@ -53,61 +49,68 @@
     420, 205, 25, 90,  0,
 
     // Map 2
-    42, 58, 30, 130,  4,
-    18, 95, 185, 95,
-    185, 95, 185, 200,
-    185, 200, 310, 200,
-    320, 18, 320, 85,
+    392, 260, 40, 45,  2,
+    160, 18, 160, 200,
+    326, 113, 326, 298,
 
     // Map 3
-    340, 50, 30, 185,  3,
-    100, 60, 100, 170,
-    100, 135, 310, 135,
-    210, 220, 465, 220,
+    340, 150, 24, 110,  2,
+    160, 95, 160, 225,
+    323, 75, 323, 245,
 
     // Map 4
-    375, 192, 30, 45,  4,
-    18, 155, 270, 155,
-    200, 220, 465, 220,
-    270, 95, 270, 155,
-    200, 155, 200, 298,
+    32, 220, 28, 38,  3,
+    18, 160, 340, 160,
+    395, 18, 465, 94,
+    395, 298, 465, 226,
 
     // Map 5
-    60, 145, 63, 25,  4,
-    18, 130, 365, 130,
-    115, 205, 365, 205,
-    115, 130, 115, 205,
-    365, 130, 365, 205,
+    75, 176, 450, 36,  3,
+    18, 160, 180, 160,
+    300, 160, 465, 160,
+    240, 220, 240, 298,
 
     // Map 6
-    135, 31, 28, 190,  7,
-    18, 180, 285, 180,
-    285, 180, 285, 80,
-    120, 80, 285, 80,
-    120, 18, 120, 80,
-    380, 100, 465, 100,
-    380, 100, 380, 298,
-    346, 18, 346, 56,
+    165, 210, 348, 28,  3,
+    200, 184, 200, 298,
+    120, 110, 200, 184,
+    330, 18, 330, 165,
 
     // Map 7
-    75, 250, 63, 30,  7,
-    18, 136, 165, 136,
-    218, 128, 323, 128,
-    323, 128, 323, 90,
-    100, 180, 205, 180,
-    319, 220, 319, 298,
-    18, 229, 180, 229
+    357, 130, 30, 110,  4,
+    160, 160, 223, 70,
+    95, 160, 158, 250,
+    310, 160, 373, 70,
+    245, 160, 308, 250,
+
+    // Map 8
+    35, 65, 190, 28,  4,
+    140, 18, 140, 135,
+    100, 215, 220, 250,
+    300, 115, 465, 115,
+    316, 175, 316, 258,
+
+    // Map 9
+    172, 172, 25, 38,  4,
+    18, 160, 219, 160,
+    175, 235, 246, 120,
+    350, 18, 380, 145,
+    290, 220, 385, 220,
+
+    // Map 10
+    250, 186, 28, 32,  5,
+    18, 145, 305, 145,
+    90, 145, 90, 210,
+    305, 145, 305, 238,
+    140, 238, 305, 238,
+    382, 66, 465, 116
   ]);
 
-  // Pre-compute the starting index in MAP_DATA for each map.
-  const MAP_OFFSETS = new Int16Array(7);
-  (function() {
+  function findMapBase(m) {
     let pos = 0;
-    for (let m = 0; m < 7; m++) {
-      MAP_OFFSETS[m] = pos;
-      pos += 5 + MAP_DATA[pos + 4] * 4;
-    }
-  })();
+    for (let i = 0; i < m; i++) pos += 5 + MAP_DATA[pos + 4] * 4;
+    return pos;
+  }
 
   // ─── Title Screen ─────────────────────────────────────────────────────────
 
@@ -115,10 +118,9 @@
     gameState = 'TITLE_SCREEN';
     winnerId = -1;
 
-    h.setColor(0).fillRect(0, 0, 480, 320);
-    h.setColor(2).drawRect(18, 18, 465, 298);
+    h.setColor(0).fillRect(0, 0, 480, 320).setColor(2).drawRect(18, 18, 465, 298);
 
-    h.setFont("Monofonto23").setFontAlign(0, -1).setColor(3).drawString("Radroach Races", 240, 55);
+    h.setFont("Monofonto36").setFontAlign(0, -1).setColor(3).drawString("RADROACH RACES", 240, 52);
 
     h.setColor(2).drawLine(55, 180, 425, 180).drawLine(55, 200, 425, 200);
     for (let fx = 75; fx < 425; fx += 35) {
@@ -131,10 +133,7 @@
 
     h.setColor(3).fillEllipse(200, 165, 280, 215).fillCircle(240, 150, 18).drawLine(236, 138, 205, 105).drawLine(244, 138, 275, 105).drawPoly([205, 165, 180, 175, 165, 200], false).drawPoly([200, 190, 175, 200, 160, 230], false).drawPoly([275, 165, 300, 175, 315, 200], false).drawPoly([280, 190, 305, 200, 320, 230], false);
 
-    h.setFont("Monofonto16").setFontAlign(0, -1).setColor(3).drawString("PRESS LEFT WHEEL TO START!", 240, 270);
-
-    h.flip();
-    Pip.lastFlip = getTime();
+    h.setFont("Monofonto23").setFontAlign(0, -1).setColor(3).drawString("PRESS LEFT WHEEL TO START!", 240, 255);
 
     Pip.onExclusive("knob1", handleKnobStart);
   }
@@ -155,8 +154,8 @@
     gameState = 'COUNTDOWN';
     countdownValue = 5;
 
-    currentMapId = Math.randInt(7);
-    const base = MAP_OFFSETS[currentMapId];
+    currentMapId = TEST_MAP > 0 ? TEST_MAP - 1 : Math.randInt(10);
+    const base = findMapBase(currentMapId);
     const wallCount = MAP_DATA[base + 4];
 
     trackWalls = new Int16Array(wallCount * 4);
@@ -174,18 +173,19 @@
     startX     = MAP_DATA[base + 2];
     startYBase = MAP_DATA[base + 3];
 
-    // Shuffle spawn slots so roach order varies each race
-    const slots = [0, 21, 42, 63, 84];
+    // Maps 2, 6, 8 (0-based: 1, 5, 7) use horizontal spawn spread; all others use vertical.
+    const horizSpawn = (currentMapId === 1 || currentMapId === 5 || currentMapId === 7);
+    const slots = horizSpawn ? [0, 21, 42, 63, 84] : [0, 23, 44, 65, 86];
     for (let s = 4; s > 0; s--) {
       const sv = Math.randInt(s + 1);
       const tmp = slots[s]; slots[s] = slots[sv]; slots[sv] = tmp;
     }
     radroaches = [
-      { id: 1, shape: 'square',   cx: startX + 7, cy: startYBase + 7 + slots[0], vx: 0, vy: 0, hitR: SHAPES.square.hitR },
-      { id: 2, shape: 'triangle', cx: startX + 7, cy: startYBase + 7 + slots[1], vx: 0, vy: 0, hitR: SHAPES.triangle.hitR },
-      { id: 3, shape: 'diamond',  cx: startX + 7, cy: startYBase + 7 + slots[2], vx: 0, vy: 0, hitR: SHAPES.diamond.hitR },
-      { id: 4, shape: 'pentagon', cx: startX + 7, cy: startYBase + 7 + slots[3], vx: 0, vy: 0, hitR: SHAPES.pentagon.hitR },
-      { id: 5, shape: 'hexagon',  cx: startX + 7, cy: startYBase + 7 + slots[4], vx: 0, vy: 0, hitR: SHAPES.hexagon.hitR }
+      { id: 1, cx: startX + 7 + (horizSpawn ? slots[0] : 0), cy: startYBase + 7 + (horizSpawn ? 0 : slots[0]), vx: 0, vy: 0, hitR: 10.7 },
+      { id: 2, cx: startX + 7 + (horizSpawn ? slots[1] : 0), cy: startYBase + 7 + (horizSpawn ? 0 : slots[1]), vx: 0, vy: 0, hitR: 10.7 },
+      { id: 3, cx: startX + 7 + (horizSpawn ? slots[2] : 0), cy: startYBase + 7 + (horizSpawn ? 0 : slots[2]), vx: 0, vy: 0, hitR: 10.7 },
+      { id: 4, cx: startX + 7 + (horizSpawn ? slots[3] : 0), cy: startYBase + 7 + (horizSpawn ? 0 : slots[3]), vx: 0, vy: 0, hitR: 10.7 },
+      { id: 5, cx: startX + 7 + (horizSpawn ? slots[4] : 0), cy: startYBase + 7 + (horizSpawn ? 0 : slots[4]), vx: 0, vy: 0, hitR: 10.7 }
     ];
     for (let i = 0; i < radroaches.length; i++) {
       setRandomVelocity(radroaches[i], 4);
@@ -208,6 +208,8 @@
 
     if (countdownValue > 0) {
       h.setFont("Monofonto96").setFontAlign(0, 0).setColor(3).drawString(countdownValue.toString(), 240, 160);
+      h.setColor(0).fillRect(67, 226, 407, 275).setColor(3).drawRect(69, 228, 405, 273);
+      h.setFont("Monofonto36").setFontAlign(0, -1).setColor(3).drawString("PLACE YOUR BETS!!!", 240, 230);
       countdownValue--;
     } else {
       clearInterval(countdownTimer);
@@ -220,60 +222,21 @@
   // ─── Drawing ──────────────────────────────────────────────────────────────
 
   function drawShape(r) {
-    const s = SHAPES[r.shape], cx = r.cx, cy = r.cy, hf = s.half, hf2 = hf - 1;
-    h.setColor(3);
-
-    if (r.shape === 'square') {
-      h.drawRect(cx - hf, cy - hf, cx + hf, cy + hf);
-      h.drawRect(cx - hf2, cy - hf2, cx + hf2, cy + hf2);
-    } else if (r.shape === 'triangle') {
-      h.drawPoly([cx, cy - hf, cx + hf * 0.866, cy + hf * 0.5, cx - hf * 0.866, cy + hf * 0.5], true);
-      h.drawPoly([cx, cy - hf2, cx + hf2 * 0.866, cy + hf2 * 0.5, cx - hf2 * 0.866, cy + hf2 * 0.5], true);
-    } else if (r.shape === 'diamond') {
-      h.drawPoly([cx, cy - hf, cx + hf, cy, cx, cy + hf, cx - hf, cy], true);
-      h.drawPoly([cx, cy - hf2, cx + hf2, cy, cx, cy + hf2, cx - hf2, cy], true);
-    } else if (r.shape === 'pentagon') {
-      h.drawPoly([
-        cx, cy - hf,
-        cx + hf * 0.951, cy - hf * 0.309,
-        cx + hf * 0.588, cy + hf * 0.809,
-        cx - hf * 0.588, cy + hf * 0.809,
-        cx - hf * 0.951, cy - hf * 0.309
-      ], true);
-      h.drawPoly([
-        cx, cy - hf2,
-        cx + hf2 * 0.951, cy - hf2 * 0.309,
-        cx + hf2 * 0.588, cy + hf2 * 0.809,
-        cx - hf2 * 0.588, cy + hf2 * 0.809,
-        cx - hf2 * 0.951, cy - hf2 * 0.309
-      ], true);
-    } else if (r.shape === 'hexagon') {
-      const q = hf / 2, q2 = hf2 / 2;
-      h.drawPoly([cx - hf + q, cy - hf, cx + hf - q, cy - hf, cx + hf, cy, cx + hf - q, cy + hf, cx - hf + q, cy + hf, cx - hf, cy], true);
-      h.drawPoly([cx - hf2 + q2, cy - hf2, cx + hf2 - q2, cy - hf2, cx + hf2, cy, cx + hf2 - q2, cy + hf2, cx - hf2 + q2, cy + hf2, cx - hf2, cy], true);
-    }
+    h.setColor(3).setFont("Monofonto23").setFontAlign(0, 0)
+      .drawString(ROACH_LETTERS[r.id], r.cx, r.cy);
   }
 
   function drawTrack() {
-    h.setColor(3).drawRect(18, 18, 465, 298).drawRect(19, 19, 464, 297);
+    h.setColor(3).drawRect(18, 18, 465, 298);
 
     for (let i = 0; i < trackWalls.length; i += 4) {
       const lx1 = trackWalls[i], ly1 = trackWalls[i+1], lx2 = trackWalls[i+2], ly2 = trackWalls[i+3];
       drawLineCached(lx1, ly1, lx2, ly2);
-      // Double-pixel width: offset by 1 on the thin axis so the line reads clearly
-      const spanY = ly2 > ly1 ? ly2 - ly1 : ly1 - ly2;
-      const spanX = lx2 > lx1 ? lx2 - lx1 : lx1 - lx2;
-      if (spanY < spanX) {
-        drawLineCached(lx1, ly1 + 1, lx2, ly2 + 1);
-      } else {
-        drawLineCached(lx1 + 1, ly1, lx2 + 1, ly2);
-      }
     }
 
-    h.setFont("Monofonto14").setFontAlign(-1, -1).setColor(2).drawString("Map " + (currentMapId + 1), 25, 25);
+    h.setFont("Monofonto14").setFontAlign(-1, -1).setColor(3).drawString("Map " + (currentMapId + 1), 225, 302);
 
-    h.setColor(3).fillRect(goalPos.x, goalPos.y, goalPos.x + goalPos.w, goalPos.y + goalPos.h);
-    h.setColor(2).fillRect(goalPos.x + 6, goalPos.y - 8, goalPos.x + 11, goalPos.y).fillRect(goalPos.x - 6, goalPos.y + 6, goalPos.x, goalPos.y + 11);
+    h.setColor(3).fillRect(goalPos.x, goalPos.y, goalPos.x + goalPos.w, goalPos.y + goalPos.h).setColor(2).fillRect(goalPos.x + 6, goalPos.y - 8, goalPos.x + 11, goalPos.y).fillRect(goalPos.x - 6, goalPos.y + 6, goalPos.x, goalPos.y + 11);
   }
 
   // ─── Physics ──────────────────────────────────────────────────────────────
@@ -317,40 +280,31 @@
       const x1 = trackWalls[i],   y1 = trackWalls[i+1];
       const x2 = trackWalls[i+2], y2 = trackWalls[i+3];
 
-      // Project roach center onto the segment, clamped to [0,1]
       const segDx = x2 - x1, segDy = y2 - y1;
       const lenSq = segDx * segDx + segDy * segDy;
       let t = lenSq > 0 ? ((r.cx - x1) * segDx + (r.cy - y1) * segDy) / lenSq : 0;
       if (t < 0) t = 0; else if (t > 1) t = 1;
 
-      // Closest point on segment to roach center
       const clx = x1 + t * segDx;
       const cly = y1 + t * segDy;
-
-      // Vector from closest point to roach center
       const ex = r.cx - clx;
       const ey = r.cy - cly;
       const distSq = ex * ex + ey * ey;
 
       if (distSq < hr * hr && distSq > 0) {
         const dist = Math.sqrt(distSq);
-        // Outward normal: direction from wall toward roach center
         const nx = ex / dist;
         const ny = ey / dist;
 
-        // Push roach out to just touching the wall surface
         const pen = hr - dist;
         r.cx += nx * pen;
         r.cy += ny * pen;
 
-        // Reflect velocity along the outward normal
         const dot = r.vx * nx + r.vy * ny;
         if (dot < 0) {
-          // Only reflect if moving toward the wall (avoids double-reflection)
           r.vx -= 2 * dot * nx;
           r.vy -= 2 * dot * ny;
 
-          // Renormalize to preserve speed after reflection
           const spd = Math.sqrt(r.vx * r.vx + r.vy * r.vy);
           if (spd > 0) { r.vx = r.vx / spd * 3; r.vy = r.vy / spd * 3; }
 
@@ -361,6 +315,11 @@
     }
 
     if (bounced) {
+      if (getTime() - lastFlapTime >= 0.25) {
+        lastFlapTime = getTime();
+        Pip.audioStart('HOLO/RADROACH_RACES/assets/FLAP.WAV');
+      }
+
       const vxAbs = r.vx < 0 ? -r.vx : r.vx;
       const vyAbs = r.vy < 0 ? -r.vy : r.vy;
       let fixed = 0;
@@ -457,7 +416,6 @@
     }
     checkRoachCollisions();
 
-    // Loop through the fixed 20 entries (5 roaches * 4 rect values)
     for (let i = 0; i < 20; i += 4) {
       h.setClipRect(dirty[i], dirty[i+1], dirty[i+2], dirty[i+3]);
       drawTrack();
@@ -489,13 +447,9 @@
   }
 
   function displayWinner() {
-    h.setColor(0).fillRect(120, 130, 360, 190);
-    h.setColor(3).drawRect(122, 132, 358, 188);
+    h.setColor(0).fillRect(120, 130, 360, 190).setColor(3).drawRect(122, 132, 358, 188);
 
-    h.setFont("Monofonto16").setFontAlign(0, -1).setColor(3);
-    h.drawString(SHAPE_NAMES[winnerId] + " ROACH WINS!", 240, 142);
-    h.setFont("Monofonto14");
-    h.drawString("PRESS LEFT WHEEL TO RACE AGAIN!", 240, 168);
+    h.setFont("Monofonto16").setFontAlign(0, -1).setColor(3).drawString('"' + ROACH_LETTERS[winnerId] + '" Roach Wins!', 240, 140).setFont("Monofonto14").drawString("PRESS LEFT WHEEL TO RACE AGAIN!", 240, 167);
   }
 
   // ─── Main Loop ────────────────────────────────────────────────────────────
